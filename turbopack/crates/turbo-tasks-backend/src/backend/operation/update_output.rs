@@ -1,6 +1,6 @@
 use std::{borrow::Cow, mem::take};
 
-use anyhow::{anyhow, Result};
+use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use turbo_tasks::{util::SharedError, RawVc, TaskId};
 
@@ -65,7 +65,6 @@ impl UpdateOutputOperation {
             .then(|| new_children.iter().copied().collect())
             .unwrap_or_default();
 
-        let old_error = task.remove(&CachedDataItemKey::Error {});
         let current_output = get!(task, Output);
         let output_value = match output {
             Ok(Ok(RawVc::TaskOutput(output_task_id))) => {
@@ -95,23 +94,20 @@ impl UpdateOutputOperation {
                 panic!("LocalOutput must not be output of a task");
             }
             Ok(Err(err)) => {
-                task.insert(CachedDataItem::Error {
-                    value: SharedError::new(err.context(format!(
-                        "Execution of {} failed",
-                        ctx.get_task_description(task_id)
-                    ))),
-                });
-                OutputValue::Error
+                if let Some(OutputValue::Error(old_error)) = current_output {
+                    if old_error.eq_stack(&err) {
+                        return;
+                    }
+                }
+                OutputValue::Error(SharedError::new(err))
             }
             Err(panic) => {
-                task.insert(CachedDataItem::Error {
-                    value: SharedError::new(anyhow!(
-                        "Panic in {}: {:?}",
-                        ctx.get_task_description(task_id),
-                        panic
-                    )),
-                });
-                OutputValue::Panic
+                if let Some(OutputValue::Panic(old_panic)) = current_output {
+                    if old_panic.as_deref() == panic.as_deref() {
+                        return;
+                    }
+                }
+                OutputValue::Panic(panic.map(|s| s.into()))
             }
         };
         let old_content = task.insert(CachedDataItem::Output {
@@ -137,7 +133,6 @@ impl UpdateOutputOperation {
 
         drop(task);
         drop(old_content);
-        drop(old_error);
 
         UpdateOutputOperation::MakeDependentTasksDirty {
             #[cfg(feature = "trace_task_dirty")]

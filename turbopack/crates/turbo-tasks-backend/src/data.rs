@@ -2,6 +2,7 @@ use std::cmp::Ordering;
 
 use rustc_hash::FxHashSet;
 use serde::{Deserialize, Serialize};
+use turbo_rcstr::RcStr;
 use turbo_tasks::{
     event::{Event, EventListener},
     registry,
@@ -52,20 +53,20 @@ pub struct CollectiblesRef {
     pub collectible_type: TraitTypeId,
 }
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum OutputValue {
     Cell(CellRef),
     Output(TaskId),
-    Error,
-    Panic,
+    Error(SharedError),
+    Panic(Option<RcStr>),
 }
 impl OutputValue {
     fn is_transient(&self) -> bool {
         match self {
             OutputValue::Cell(cell) => cell.task.is_transient(),
             OutputValue::Output(task) => task.is_transient(),
-            OutputValue::Error => false,
-            OutputValue::Panic => false,
+            OutputValue::Error(_) => false,
+            OutputValue::Panic(_) => false,
         }
     }
 }
@@ -482,12 +483,6 @@ pub enum CachedDataItem {
         target: CollectiblesRef,
         value: (),
     },
-
-    // Transient Error State
-    #[serde(skip)]
-    Error {
-        value: SharedError,
-    },
 }
 
 impl CachedDataItem {
@@ -523,7 +518,6 @@ impl CachedDataItem {
             CachedDataItem::OutdatedOutputDependency { .. } => false,
             CachedDataItem::OutdatedCellDependency { .. } => false,
             CachedDataItem::OutdatedCollectiblesDependency { .. } => false,
-            CachedDataItem::Error { .. } => false,
         }
     }
 
@@ -578,7 +572,6 @@ impl CachedDataItem {
             | Self::OutdatedCollectiblesDependency { .. }
             | Self::InProgressCell { .. }
             | Self::InProgress { .. }
-            | Self::Error { .. }
             | Self::Activeness { .. } => TaskDataCategory::All,
         }
     }
@@ -617,7 +610,6 @@ impl CachedDataItemKey {
             CachedDataItemKey::OutdatedOutputDependency { .. } => false,
             CachedDataItemKey::OutdatedCellDependency { .. } => false,
             CachedDataItemKey::OutdatedCollectiblesDependency { .. } => false,
-            CachedDataItemKey::Error { .. } => false,
         }
     }
 
@@ -660,7 +652,6 @@ impl CachedDataItemType {
             | Self::OutdatedCollectiblesDependency { .. }
             | Self::InProgressCell { .. }
             | Self::InProgress { .. }
-            | Self::Error { .. }
             | Self::Activeness { .. } => TaskDataCategory::All,
         }
     }
