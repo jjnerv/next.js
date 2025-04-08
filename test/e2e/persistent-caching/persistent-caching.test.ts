@@ -120,7 +120,6 @@ describe('persistent-caching', () => {
         )
         await browser.close()
       }
-
       {
         const browser = await next.browser('/add-me')
         expect(await browser.elementByCss('p').text()).toBe('hello world')
@@ -128,6 +127,7 @@ describe('persistent-caching', () => {
       }
     }
 
+    let ok = false
     await next.patchFile(
       'pages/pages.tsx',
       (content) => {
@@ -154,6 +154,7 @@ describe('persistent-caching', () => {
                   await start()
                   await checkChanges()
                   await stop()
+                  ok = true
                 } finally {
                   await next.renameFolder('app/add-me', 'app/remove-me')
                 }
@@ -163,6 +164,7 @@ describe('persistent-caching', () => {
         )
       }
     )
+    if (!ok) await stop()
     await start()
   })
 })
