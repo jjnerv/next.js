@@ -32,6 +32,11 @@ export interface DefineEnvPluginOptions {
   isNodeServer: boolean
   middlewareMatchers: MiddlewareMatcher[] | undefined
   omitNonDeterministic?: boolean
+  previewModeProps?: {
+    previewModeId: string
+    previewModeSigningKey: string
+    previewModeEncryptionKey: string
+  }
 }
 
 interface DefineEnv {
@@ -102,6 +107,7 @@ export function getDefineEnv({
   isNodeServer,
   middlewareMatchers,
   omitNonDeterministic,
+  previewModeProps,
 }: DefineEnvPluginOptions): SerializedDefineEnv {
   const nextPublicEnv = getNextPublicEnvironmentVariables()
   const nextConfigEnv = getNextConfigEnv(config)
@@ -262,6 +268,29 @@ export function getDefineEnv({
             needsExperimentalReact(config),
         }
       : undefined),
+
+    'process.env.__NEXT_MULTI_ZONE_DRAFT_MODE': JSON.stringify(
+      config.experimental.multiZoneDraftMode
+    ),
+    'process.env.__NEXT_TRUST_HOST_HEADER': JSON.stringify(
+      config.experimental.trustHostHeader
+    ),
+    'process.env.__NEXT_ALLOWED_REVALIDATE_HEADERS': JSON.stringify(
+      config.experimental.allowedRevalidateHeaderKeys
+    ),
+
+    // TODO: investigate not inlining these in favor of the same
+    // env handling we do for edge runtime with these
+    ...(isNodeServer
+      ? {
+          'process.env.__NEXT_PREVIEW_MODE_ID': previewModeProps?.previewModeId,
+          'process.env.__NEXT_PREVIEW_MODE_SIGNING_KEY':
+            previewModeProps?.previewModeSigningKey,
+          'process.env.__NEXT_PREVIEW_MODE_ENCRYPTION_KEY':
+            previewModeProps?.previewModeEncryptionKey,
+          'process.env.__NEXT_RELATIVE_DIST_DIR': config.distDir,
+        }
+      : {}),
   }
 
   const userDefines = config.compiler?.define ?? {}

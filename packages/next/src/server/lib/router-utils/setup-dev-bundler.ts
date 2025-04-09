@@ -53,6 +53,7 @@ import {
   DEV_CLIENT_MIDDLEWARE_MANIFEST,
   PHASE_DEVELOPMENT_SERVER,
   TURBOPACK_CLIENT_MIDDLEWARE_MANIFEST,
+  ROUTES_MANIFEST,
 } from '../../../shared/lib/constants'
 
 import { getMiddlewareRouteMatcher } from '../../../shared/lib/router/utils/middleware-route-matcher'
@@ -193,6 +194,25 @@ async function startWatcher(opts: SetupOpts) {
       })
 
   await hotReloader.start()
+
+  // have to write this after starting hot-reloader since that
+  // cleans the dist dir
+  const routesManifestPath = path.join(distDir, ROUTES_MANIFEST)
+  const routesManifest = {
+    version: 3,
+    caseSensitive: !!nextConfig.experimental.caseSensitiveRoutes,
+    basePath: nextConfig.basePath,
+    rewrites: opts.fsChecker.rewrites,
+    redirects: opts.fsChecker.redirects,
+    headers: opts.fsChecker.headers,
+    dataRoutes: [],
+    i18n: nextConfig.i18n || undefined,
+    skipMiddlewareUrlNormalize: nextConfig.skipMiddlewareUrlNormalize,
+  }
+  await fs.promises.writeFile(
+    routesManifestPath,
+    JSON.stringify(routesManifest)
+  )
 
   if (opts.nextConfig.experimental.nextScriptWorkers) {
     await verifyPartytownSetup(

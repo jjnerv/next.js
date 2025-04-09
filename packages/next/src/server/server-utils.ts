@@ -25,12 +25,12 @@ import {
 import { normalizeNextQueryParam } from './web/utils'
 import type { IncomingHttpHeaders } from 'http'
 
-export function normalizeVercelUrl(
+export function normalizeCdnUrl(
   req: BaseNextRequest,
   paramKeys: string[],
   defaultRouteRegex: ReturnType<typeof getNamedRouteRegex> | undefined
 ) {
-  // make sure to normalize req.url on Vercel to strip dynamic and rewrite
+  // make sure to normalize req.url from CDNs to strip dynamic and rewrite
   // params from the query which are added during routing
   const _parsedUrl = parseUrl(req.url!, true)
   delete (_parsedUrl as any).search
@@ -390,8 +390,8 @@ export function getUtils({
         ignoreMissingOptional
       )
     },
-    normalizeVercelUrl: (req: BaseNextRequest, paramKeys: string[]) =>
-      normalizeVercelUrl(req, paramKeys, defaultRouteRegex),
+    normalizeCdnUrl: (req: BaseNextRequest, paramKeys: string[]) =>
+      normalizeCdnUrl(req, paramKeys, defaultRouteRegex),
     interpolateDynamicPath: (
       pathname: string,
       params: Record<string, undefined | string | string[]>

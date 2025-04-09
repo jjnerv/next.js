@@ -18,7 +18,6 @@ import type { Params } from './request/params'
 import type { MiddlewareRouteMatch } from '../shared/lib/router/utils/middleware-route-matcher'
 import type { RouteMatch } from './route-matches/route-match'
 import type { IncomingMessage, ServerResponse } from 'http'
-import type { PagesAPIRouteModule } from './route-modules/pages-api/module'
 import type { UrlWithParsedQuery } from 'url'
 import type { ParsedUrlQuery } from 'querystring'
 import type { ParsedUrl } from '../shared/lib/router/utils/parse-url'
@@ -96,7 +95,6 @@ import { pipeToNodeResponse } from './pipe-readable'
 import { createRequestResponseMocks } from './lib/mock-request'
 import { NEXT_RSC_UNION_QUERY } from '../client/components/app-router-headers'
 import { signalFromNodeResponse } from './web/spec-extension/adapters/next-request'
-import { RouteModuleLoader } from './lib/module-loader/route-module-loader'
 import { loadManifest } from './load-manifest'
 import { lazyRenderAppPage } from './route-modules/app-page/module.render'
 import { lazyRenderPagesPage } from './route-modules/pages/module.render'
@@ -112,6 +110,7 @@ import { AsyncCallbackSet } from './lib/async-callback-set'
 import { initializeCacheHandlers, setCacheHandler } from './use-cache/handlers'
 import type { UnwrapPromise } from '../lib/coalesced-function'
 import { populateStaticEnv } from '../lib/static-env'
+import { NodeModuleLoader } from './lib/module-loader/node-module-loader'
 
 export * from './base-server'
 
@@ -566,30 +565,24 @@ export default class NextNodeServer extends BaseServer<
         }
       }
     }
-
     // The module supports minimal mode, load the minimal module.
-    const module = await RouteModuleLoader.load<PagesAPIRouteModule>(
-      match.definition.filename
-    )
+    // Restore original URL as the handler handles it's own parsing
+    const parsedInitUrl = parseUrl(getRequestMeta(req, 'initURL') || req.url)
+    req.url = `${parsedInitUrl.pathname}${parsedInitUrl.search || ''}`
 
-    query = { ...query, ...match.params }
-
-    await module.render(req.originalRequest, res.originalResponse, {
-      previewProps: this.renderOpts.previewProps,
-      revalidate: this.revalidate.bind(this),
-      trustHostHeader: this.nextConfig.experimental.trustHostHeader,
-      allowedRevalidateHeaderKeys:
-        this.nextConfig.experimental.allowedRevalidateHeaderKeys,
-      hostname: this.fetchHostname,
-      minimalMode: this.minimalMode,
-      dev: this.renderOpts.dev === true,
-      query,
-      params: match.params,
-      page: match.definition.pathname,
-      onError: this.instrumentationOnRequestError.bind(this),
-      multiZoneDraftMode: this.nextConfig.experimental.multiZoneDraftMode,
+    const loader = new NodeModuleLoader()
+    const module = (await loader.load(match.definition.filename)) as {
+      handler: (
+        req: IncomingMessage,
+        res: ServerResponse,
+        ctx: {
+          waitUntil: ReturnType<BaseServer['getWaitUntil']>
+        }
+      ) => Promise<void>
+    }
+    await module.handler(req.originalRequest, res.originalResponse, {
+      waitUntil: this.getWaitUntil(),
     })
-
     return true
   }
 

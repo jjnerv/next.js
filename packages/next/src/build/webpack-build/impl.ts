@@ -120,7 +120,7 @@ export async function webpackBuildImpl(
     reactProductionProfiling: NextBuildContext.reactProductionProfiling!,
     noMangling: NextBuildContext.noMangling!,
     clientRouterFilters: NextBuildContext.clientRouterFilters!,
-    previewModeId: NextBuildContext.previewModeId!,
+    previewProps: NextBuildContext.previewProps,
     allowedRevalidateHeaderKeys: NextBuildContext.allowedRevalidateHeaderKeys!,
     fetchCacheKeyPrefix: NextBuildContext.fetchCacheKeyPrefix!,
   }
